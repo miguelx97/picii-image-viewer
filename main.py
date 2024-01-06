@@ -1,6 +1,6 @@
 # main.py
 from kivy.app import App
-from viewer import ImageViewer
+from app.viewer import ImageViewer
 
 class ImageViewerApp(App):
     def build(self):
