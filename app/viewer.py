@@ -1,5 +1,4 @@
-# viewer.py
-import os
+from os import path, listdir
 from kivy.uix.image import Image
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
@@ -8,6 +7,7 @@ from kivy.core.window import Window
 from app.folderpicker import FolderPicker
 from app.models.action import Action
 import app.models.color as color
+from app.services.persistence import Persistence
 
 class ImageViewer(BoxLayout):
     def __init__(self, **kwargs):
@@ -28,12 +28,29 @@ class ImageViewer(BoxLayout):
         self.selected_folder = folder_path
         print('Selected folder:', self.selected_folder)
 
-        self.image_files = [f for f in os.listdir(self.selected_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        self.image_files = [f for f in listdir(self.selected_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        self.persistence = Persistence('.picii.pkl', self.selected_folder)
 
         if self.image_files:
             self.show_image_viewer()
+            self.load_persisted_actions()
         else:
             print('No image files found in the selected folder.')
+
+    def load_persisted_actions(self):
+        db_actions = self.persistence.load()
+        if not db_actions:
+            return
+        self.actions = db_actions
+        print('Loaded actions:', self.actions)
+        for index, image in enumerate(self.image_files):
+            if image in self.actions:
+                if self.actions[image] == Action.DELETE.value:
+                    # change the image color to red
+                    self.gallery_layout.children[len(self.gallery_layout.children) - index - 1].background_color = color.BTN_DELETE
+                elif self.actions[image] == Action.FAVOURITE.value:
+                    # change the image color to green
+                    self.gallery_layout.children[len(self.gallery_layout.children) - index - 1].background_color = color.BTN_FAVOURITE
 
     def show_image_viewer(self):
 
@@ -42,7 +59,7 @@ class ImageViewer(BoxLayout):
                 return name
             else:
                 # Extract the file extension
-                base_name, extension = os.path.splitext(name)
+                base_name, extension = path.splitext(name)
                 
                 # Abbreviate and append the extension
                 abbreviated_name = base_name[:max_length - len(extension)] + "..." + extension
@@ -71,8 +88,8 @@ class ImageViewer(BoxLayout):
         image_viewer_layout = BoxLayout(orientation='vertical')
 
         # Adding the image
-        self.image = Image(source=os.path.join(self.selected_folder, self.image_files[self.current_image_index]))
-        image_viewer_layout.add_widget(self.image)
+        self.image_view = Image(source=path.join(self.selected_folder, self.image_files[self.current_image_index]))
+        image_viewer_layout.add_widget(self.image_view)
 
         # Adding the button bar
         button_bar = BoxLayout(orientation='horizontal', size_hint_y=None, height=50)
@@ -116,26 +133,28 @@ class ImageViewer(BoxLayout):
         if last_image not in self.actions:
             last_image_color = color.BTN_DEFAULT
         else:
-            last_image_color = color.BTN_DELETE if self.actions[last_image] == Action.DELETE else color.BTN_FAVOURITE
+            last_image_color = color.BTN_DELETE if self.actions[last_image] == Action.DELETE.value else color.BTN_FAVOURITE
             
         self.gallery_layout.children[len(self.gallery_layout.children) - self.current_image_index - 1].background_color = last_image_color  
         self.current_image_index = new_index
-        self.image.source = os.path.join(self.selected_folder, last_image)
+        self.image_view.source = path.join(self.selected_folder, self.image_files[self.current_image_index])
         self.gallery_layout.children[len(self.gallery_layout.children) - self.current_image_index - 1].background_color = color.BTN_SELECTED   
 
     def mark_for_deleting(self, instance):
         self.add_action_to_image(self.image_files[self.current_image_index], Action.DELETE)
         self.go_forward(instance)
+        self.persistence.save(self.actions)
 
     def mark_as_favourite(self, instance):
         self.add_action_to_image(self.image_files[self.current_image_index], Action.FAVOURITE)
         self.go_forward(instance)
+        self.persistence.save(self.actions)
 
     def add_action_to_image(self, image:str, action:Action):
-        if image in self.actions and self.actions[image] == action:
+        if image in self.actions and self.actions[image] == action.value:
             del self.actions[image]
         else:
-            self.actions[image] = action
+            self.actions[image] = action.value
 
     def keyboard_on_key_down(self, window, key, scancode, codepoint, modifier):
         if key in [273, 63232]:  # UP arrow key
