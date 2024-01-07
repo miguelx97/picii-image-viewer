@@ -1,0 +1,4 @@
+Tecnologías:
+Python
+Kivy
+FileChooserIconView
