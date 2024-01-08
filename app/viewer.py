@@ -1,5 +1,6 @@
 from functools import partial
-from os import path, listdir, remove
+from os import path, listdir, remove, makedirs
+from shutil import move
 from click import confirmation_option
 from kivy.uix.image import Image
 from kivy.uix.boxlayout import BoxLayout
@@ -70,7 +71,7 @@ class ImageViewer(BoxLayout):
         # Creating a FolderPicker
         self.folder_picker_layout = FolderPicker(on_folder_selected=self.on_folder_selected)
         self.app_layout.add_widget(self.folder_picker_layout)
-        self.on_folder_selected('/home/miguel/Pictures/')
+        # self.on_folder_selected('/home/miguel/Pictures/')
     
     def get_images(self):
         return self.filtered_images if self.filtered_images else self.image_files
@@ -255,15 +256,32 @@ class ImageViewer(BoxLayout):
             if self.actions[image] == Action.DELETE.value:
                 print('Deleting image:', image)
                 remove(path.join(self.selected_folder, image))
-
         self.actions = {image: action for image, action in self.actions.items() if action != Action.DELETE.value}
-        self.image_files = [f for f in listdir(self.selected_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-        self.load_images_gallery()
+        self.reload_images()
 
     def separate_favourite_images(self, instance):
+        count_to_favourite = self.nun_images_by_action(Action.FAVOURITE)
+        if count_to_favourite == 0:
+            return
+        confirmation_message = f'¿Separar {count_to_favourite} imágenes favoritas?'
+        confirmation_popup = ConfirmationPopup(message=confirmation_message, yes_label='Separar', callback_yes=self.perform_separate_favourite_images)
+        confirmation_popup.open()
+
+    def perform_separate_favourite_images(self):
+        fav_images_folder = path.join(path.dirname(self.selected_folder), "Mejores")
+        makedirs(fav_images_folder, exist_ok=True)
         for image in self.actions:
             if self.actions[image] == Action.FAVOURITE.value:
                 print('Separating image:', image)
+                image_path = path.join(self.selected_folder, image)
+                new_image_path = path.join(fav_images_folder, image)
+                move(image_path, new_image_path)
+        self.actions = {image: action for image, action in self.actions.items() if action != Action.FAVOURITE.value}
+        self.reload_images()
+
+    def reload_images(self):
+        self.image_files = [f for f in listdir(self.selected_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        self.load_images_gallery()
 
     # KEYBOARD EVENTS
 
