@@ -144,8 +144,8 @@ class ImageViewer(BoxLayout):
 
         btnDelete = Button(text='Marcar para eliminar', background_color= color.BTN_DELETE)
         btnBack = Button(text='Atras', size_hint_x=0.5)
-        btnFavourite = Button(text='Marcar como favorita', background_color= color.BTN_FAVOURITE)
         btnForward = Button(text='Siguiente', size_hint_x=0.5)
+        btnFavourite = Button(text='Marcar como favorita', background_color= color.BTN_FAVOURITE)
         
         btnDelete.bind(on_press=self.mark_for_deleting)
         btnBack.bind(on_press=self.go_back)
