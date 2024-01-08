@@ -1,9 +1,12 @@
-from os import path, listdir
+from functools import partial
+from os import path, listdir, remove
+from click import confirmation_option
 from kivy.uix.image import Image
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
+from app.confirmation_popup import ConfirmationPopup
 from app.folderpicker import FolderPicker
 from app.models.action import Action
 import app.models.color as color
@@ -27,20 +30,35 @@ class ImageViewer(BoxLayout):
         action_view = ActionView()
         action_previous = ActionPrevious(title='Picii', with_previous=False, app_icon='assets/icon.png', app_icon_width=32, app_icon_height=32)
 
-        action_group = ActionGroup(text='Filtrar Imágenes', mode='spinner')
-        action_delete = ActionButton(text='Para eliminar')
-        action_favourite = ActionButton(text='Favoritas')
-        action_all = ActionButton(text='Todas')
+        action_group_filter = ActionGroup(text='Filtrar Imágenes', mode='spinner')
+        action_filter_delete = ActionButton(text='Para eliminar')
+        action_filter_favourite = ActionButton(text='Favoritas')
+        action_filter_all = ActionButton(text='Todas')
 
-        action_delete.bind(on_press=lambda x: self.load_images_gallery(Action.DELETE))
-        action_favourite.bind(on_press=lambda x: self.load_images_gallery(Action.FAVOURITE))
-        action_all.bind(on_press=lambda x: self.load_images_gallery())
+        def show_images(action:Action=None):
+            self.load_images_gallery(action)
+            self.image_view.source = path.join(self.selected_folder, self.get_images()[self.current_image_index])
 
-        action_group.add_widget(action_delete)
-        action_group.add_widget(action_favourite)
-        action_group.add_widget(action_all)
+        action_filter_delete.bind(on_press=lambda x: show_images(Action.DELETE))
+        action_filter_favourite.bind(on_press=lambda x: show_images(Action.FAVOURITE))
+        action_filter_all.bind(on_press=lambda x: show_images())
+
+        action_group_filter.add_widget(action_filter_delete)
+        action_group_filter.add_widget(action_filter_favourite)
+        action_group_filter.add_widget(action_filter_all)
+
+        action_group_actions = ActionGroup(text='Acciones')
+        action_action_delete = ActionButton(text='Eliminar imágenes marcadas')
+        action_action_favourite = ActionButton(text='Separar imágenes favoritas')
+
+        action_action_delete.bind(on_press=self.delete_marked_images)
+        action_action_favourite.bind(on_press=self.separate_favourite_images)
+
+        action_group_actions.add_widget(action_action_delete)
+        action_group_actions.add_widget(action_action_favourite)
         
-        action_view.add_widget(action_group)
+        action_view.add_widget(action_group_actions)
+        action_view.add_widget(action_group_filter)
         action_view.add_widget(action_previous)
         action_bar.add_widget(action_view)
 
@@ -56,6 +74,9 @@ class ImageViewer(BoxLayout):
     
     def get_images(self):
         return self.filtered_images if self.filtered_images else self.image_files
+    
+    def nun_images_by_action(self, actionToSearch:Action):
+        return len([image for image in self.actions if self.actions[image] == actionToSearch.value])
 
     def on_folder_selected(self, folder_path):
         self.selected_folder = folder_path
@@ -143,6 +164,12 @@ class ImageViewer(BoxLayout):
         self.app_layout.add_widget(image_viewer_layout)
 
     def load_images_gallery(self, filter:Action=None):
+
+        if filter == Action.DELETE and self.nun_images_by_action(Action.DELETE) == 0:
+            return
+        elif filter == Action.FAVOURITE and self.nun_images_by_action(Action.FAVOURITE) == 0:
+            return
+
         self.gallery_layout.clear_widgets()
         def abbreviate_name(name, max_length=22):
             if len(name) <= max_length:
@@ -168,7 +195,6 @@ class ImageViewer(BoxLayout):
             self.gallery_layout.add_widget(image)
         
         self.paint_gallery_items()
-
         self.current_image_index = 0
         self.gallery_layout.children[len(self.gallery_layout.children) - self.current_image_index - 1].background_color = color.BTN_SELECTED
 
@@ -215,6 +241,31 @@ class ImageViewer(BoxLayout):
             del self.actions[image]
         else:
             self.actions[image] = action.value
+
+    def delete_marked_images(self, instance):
+        count_to_delete = self.nun_images_by_action(Action.DELETE)
+        if count_to_delete == 0:
+            return
+        confirmation_message = f'¿Eliminar {count_to_delete} imágenes?'
+        confirmation_popup = ConfirmationPopup(message=confirmation_message, yes_label='Eliminar', callback_yes=self.perform_delete)
+        confirmation_popup.open()
+
+    def perform_delete(self):
+        for image in self.actions:
+            if self.actions[image] == Action.DELETE.value:
+                print('Deleting image:', image)
+                remove(path.join(self.selected_folder, image))
+
+        self.actions = {image: action for image, action in self.actions.items() if action != Action.DELETE.value}
+        self.image_files = [f for f in listdir(self.selected_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        self.load_images_gallery()
+
+    def separate_favourite_images(self, instance):
+        for image in self.actions:
+            if self.actions[image] == Action.FAVOURITE.value:
+                print('Separating image:', image)
+
+    # KEYBOARD EVENTS
 
     def keyboard_on_key_down(self, window, key, scancode, codepoint, modifier):
         if key in [273, 63232]:  # UP arrow key
