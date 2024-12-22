@@ -289,6 +289,7 @@ class ImageViewer(BoxLayout):
                 remove(path.join(self.selected_folder, image))
         self.actions = {image: action for image, action in self.actions.items() if action != Action.DELETE.value}
         self.reload_images()
+        self.persistence.save(self.actions)
 
     def separate_favourite_images(self, instance):
         count_to_favourite = self.nun_images_by_action(Action.FAVOURITE)
@@ -299,16 +300,18 @@ class ImageViewer(BoxLayout):
         confirmation_popup.open()
 
     def perform_separate_favourite_images(self):
-        fav_images_folder = path.join(path.dirname(self.selected_folder), "Mejores")
+        fav_images_folder = path.join(self.selected_folder, "Mejores")
         makedirs(fav_images_folder, exist_ok=True)
         for image in self.actions:
             if self.actions[image] == Action.FAVOURITE.value:
-                print('Separating image:', image)
+                print('Separating image:', image, 'to', fav_images_folder)
                 image_path = path.join(self.selected_folder, image)
                 new_image_path = path.join(fav_images_folder, image)
                 move(image_path, new_image_path)
+
         self.actions = {image: action for image, action in self.actions.items() if action != Action.FAVOURITE.value}
         self.reload_images()
+        self.persistence.save(self.actions)
 
     def reload_images(self):
         self.image_files = [f for f in listdir(self.selected_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
