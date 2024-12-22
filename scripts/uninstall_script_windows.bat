@@ -1,35 +1,38 @@
 @echo off
-
-REM Variables
+:: Variables
 set PROJECT_NAME=picii-image-viewer
-set INSTALL_DIR=%USERPROFILE%\AppData\Local\%PROJECT_NAME%
-set CONTEXT_MENU_SCRIPT="%USERPROFILE%\AppData\Local\%PROJECT_NAME%\run_picii_image_viewer.ps1"
+set INSTALL_DIR="C:\Program Files\%PROJECT_NAME%"
+set CONTEXT_MENU_NAME=Abrir en Picii Image Viewer
 
-REM Confirmación del usuario
-echo Este script eliminará todos los archivos relacionados con %PROJECT_NAME%.
-set /p confirm="¿Estás seguro de que deseas continuar? (y/n): "
-if /i not "%confirm%"=="y" (
-    echo Desinstalación cancelada.
-    exit /b 0
+:: Check if the script is running as Administrator
+openfiles >nul 2>&1
+if %errorlevel% neq 0 (
+    echo This script needs to be run as Administrator.
+    pause
+    exit /b
 )
 
-REM Eliminar el directorio de instalación
-if exist "%INSTALL_DIR%" (
-    rmdir /S /Q "%INSTALL_DIR%"
-    echo Directorio %INSTALL_DIR% eliminado.
+:: Remove the installation directory
+if exist %INSTALL_DIR% (
+    echo Deleting installation directory...
+    rmdir /s /q %INSTALL_DIR%
+    if %errorlevel% neq 0 (
+        echo Failed to delete the installation directory. Please check permissions or delete it manually.
+    ) else (
+        echo Installation directory deleted successfully.
+    )
 ) else (
-    echo El directorio %INSTALL_DIR% no existe.
+    echo Installation directory not found. Skipping...
 )
 
-REM Eliminar la entrada del menú contextual
-echo Eliminando la entrada del menú contextual...
-powershell -Command "Remove-Item -Path 'HKCU:\\Software\\Classes\\Directory\\Background\\shell\\RunPiciiImageViewer' -Recurse -ErrorAction SilentlyContinue"
-if %errorlevel% equ 0 (
-    echo Entrada del menú contextual eliminada.
+:: Remove context menu entry from the registry
+echo Removing context menu entry...
+REG DELETE "HKEY_CLASSES_ROOT\Directory\shell\%CONTEXT_MENU_NAME%" /f
+if %errorlevel% neq 0 (
+    echo Failed to remove the context menu entry. It may have been deleted already.
 ) else (
-    echo No se encontró la entrada del menú contextual.
+    echo Context menu entry removed successfully.
 )
 
-REM Mensaje final
-echo %PROJECT_NAME% ha sido completamente desinstalado.
-pause
+:: Final message
+echo The project '%PROJECT_NAME%' has been uninstalled.

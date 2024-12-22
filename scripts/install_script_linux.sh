@@ -7,6 +7,9 @@ MAIN_SCRIPT="main.py"
 INSTALL_DIR="$HOME/.local/share/$PROJECT_NAME"
 ACTION_FILE="$HOME/.local/share/nautilus/scripts/RunPiciiImageViewer"
 
+# Install dependencies
+pip install -r requirements.txt
+
 # Verificar si el script se ejecuta desde la carpeta correcta
 if [ ! -f "$PROJECT_FOLDER/$MAIN_SCRIPT" ]; then
     echo "Error: Ejecuta este script desde la carpeta '$PROJECT_NAME' que contiene '$MAIN_SCRIPT'."

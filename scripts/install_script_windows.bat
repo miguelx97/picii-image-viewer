@@ -1,41 +1,53 @@
 @echo off
-
-REM Variables
-set PROJECT_FOLDER=%~dp0
+:: Variables
+set PROJECT_FOLDER=%cd%
 set PROJECT_NAME=picii-image-viewer
 set MAIN_SCRIPT=main.py
-set INSTALL_DIR=%USERPROFILE%\AppData\Local\%PROJECT_NAME%
-set CONTEXT_MENU_SCRIPT="%USERPROFILE%\AppData\Local\%PROJECT_NAME%\run_picii_image_viewer.ps1"
+set INSTALL_DIR="C:\Program Files\%PROJECT_NAME%"
+set CONTEXT_MENU_NAME=Abrir en Picii Image Viewer
 
-REM Install dependencies
-pip install -r requirements.txt
-
-REM Verificar si el script se ejecuta desde la carpeta correcta
-if not exist "%PROJECT_FOLDER%%MAIN_SCRIPT%" (
-    echo Error: Ejecuta este script desde la carpeta '%PROJECT_NAME%' que contiene '%MAIN_SCRIPT%'.
+:: Detect Python dynamically
+for /f "delims=" %%i in ('where python') do set PYTHON_PATH=%%i
+if not defined PYTHON_PATH (
+    echo Python could not be found. Please ensure it is installed and added to your PATH.
     exit /b 1
 )
 
-REM Crear el directorio de instalación si no existe
-if not exist "%INSTALL_DIR%" (
-    mkdir "%INSTALL_DIR%"
+set COMMAND="%PYTHON_PATH%" "%INSTALL_DIR%\%MAIN_SCRIPT%"\" "\"%%1"\"
+
+:: Verificar si el script está siendo ejecutado como administrador
+openfiles >nul 2>&1
+if %errorlevel% neq 0 (
+    echo This script needs to be run as Administrator.
+    pause
+    exit /b
 )
 
-REM Copiar los archivos necesarios al directorio de instalación
-xcopy "%PROJECT_FOLDER%%MAIN_SCRIPT%" "%INSTALL_DIR%" /Y
-xcopy "%PROJECT_FOLDER%app" "%INSTALL_DIR%\app" /E /Y
-xcopy "%PROJECT_FOLDER%assets" "%INSTALL_DIR%\assets" /E /Y
-echo El proyecto '%PROJECT_NAME%' se instaló en %INSTALL_DIR%.
+:: Install Python dependencies
+pip install -r requirements.txt || (
+    echo Failed to install dependencies. Make sure pip is installed and in your PATH.
+    exit /b 1
+)
 
-REM Crear el script de PowerShell para ejecutar el proyecto
-echo @echo off > "%CONTEXT_MENU_SCRIPT%"
-echo powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^\"& { python \"%INSTALL_DIR%\%MAIN_SCRIPT%\" '%%1' }^\" >> "%CONTEXT_MENU_SCRIPT%"
-attrib +R +S +H "%CONTEXT_MENU_SCRIPT%"
+:: Verify script is running from the correct directory
+if not exist "%PROJECT_FOLDER%\%MAIN_SCRIPT%" (
+    echo Error: Please run this script from the '%PROJECT_NAME%' folder containing '%MAIN_SCRIPT%'.
+    exit /b 1
+)
 
-REM Agregar entrada al menú contextual de Windows
-powershell -Command "Set-ItemProperty -Path 'HKCU:\\Software\\Classes\\Directory\\Background\\shell\\RunPiciiImageViewer' -Name '(default)' -Value 'Run Picii Image Viewer'"
-powershell -Command "New-Item -Path 'HKCU:\\Software\\Classes\\Directory\\Background\\shell\\RunPiciiImageViewer\\command' -Value '\"%CONTEXT_MENU_SCRIPT%\" \"%V\"'"
+:: Create the installation directory
+if not exist "%INSTALL_DIR%" (
+    mkdir %INSTALL_DIR%
+)
 
-REM Mensaje final
-echo La acción ha sido añadida al menú contextual. Ahora puedes usarla haciendo clic derecho en cualquier carpeta.
-pause
+:: Copy project files to the installation directory
+xcopy /s /y %PROJECT_FOLDER% %INSTALL_DIR%
+
+:: Add context menu entry using REG ADD
+echo Adding context menu entry...
+REG ADD "HKEY_CLASSES_ROOT\Directory\shell\%CONTEXT_MENU_NAME%" /ve /t REG_SZ /f /d "%CONTEXT_MENU_NAME%"
+REG ADD "HKEY_CLASSES_ROOT\Directory\shell\%CONTEXT_MENU_NAME%\command" /ve /t REG_SZ /f /d "%COMMAND%"
+
+:: Final message
+echo The project '%PROJECT_NAME%' has been installed in %INSTALL_DIR%.
+echo A context menu option has been added. You can now right-click on a folder to run the script.
