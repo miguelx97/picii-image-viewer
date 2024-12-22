@@ -1,3 +1,4 @@
+import asyncio
 from functools import partial
 from os import path, listdir, remove, makedirs
 from shutil import move
@@ -13,6 +14,8 @@ from app.models.action import Action
 import app.models.color as color
 from app.services.persistence import Persistence
 from kivy.uix.actionbar import ActionBar, ActionView, ActionPrevious, ActionButton, ActionGroup
+from PIL import Image as PILImage
+from PIL.ExifTags import TAGS
 import sys
 
 class ImageViewer(BoxLayout):
@@ -83,12 +86,27 @@ class ImageViewer(BoxLayout):
     
     def nun_images_by_action(self, actionToSearch:Action):
         return len([image for image in self.actions if self.actions[image] == actionToSearch.value])
+    
+    def get_exif_date(self, image_path):
+        try:
+            image = PILImage.open(image_path)
+            exif_data = image._getexif()
+            if exif_data is not None:
+                for tag, value in exif_data.items():
+                    if TAGS.get(tag) == 'DateTimeOriginal':
+                        return value  # Date the photo was taken (DateTimeOriginal)
+        except Exception as e:
+            print(f"Error reading EXIF data for {image_path}: {e}")
+        return None
 
     def on_folder_selected(self, folder_path):
         self.selected_folder = folder_path
         print('Selected folder:', self.selected_folder)
 
         self.image_files = [f for f in listdir(self.selected_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        # Sort image paths by EXIF DateTimeOriginal
+        self.image_files = sorted(self.image_files, key=lambda f: self.get_exif_date(path.join(self.selected_folder, f)) or "1900:01:01 00:00:00")
+
         self.persistence = Persistence('.picii.pkl', self.selected_folder)
 
         if self.image_files:
@@ -178,7 +196,7 @@ class ImageViewer(BoxLayout):
             return
 
         self.gallery_layout.clear_widgets()
-        def abbreviate_name(name, max_length=22):
+        def abbreviate_name(name, max_length=20):
             if len(name) <= max_length:
                 return name
             else:
@@ -220,6 +238,11 @@ class ImageViewer(BoxLayout):
         index = len(self.gallery_layout.children) - self.gallery_layout.children.index(instance) - 1
         self.change_image(index)
 
+    async def scroll_to_image_async(self, image_button):
+        # Wait for the next frame before scrolling
+        await asyncio.sleep(0)
+        self.gallery_layout.parent.scroll_to(image_button)
+
     def change_image(self, new_index:int):  
         last_image = self.get_images()[self.current_image_index]
         last_image_color:color
@@ -232,6 +255,9 @@ class ImageViewer(BoxLayout):
         self.current_image_index = new_index
         self.image_view.source = path.join(self.selected_folder, self.get_images()[self.current_image_index])
         self.gallery_layout.children[len(self.gallery_layout.children) - self.current_image_index - 1].background_color = color.BTN_SELECTED   
+        # Scroll to the selected image
+        image_button = self.gallery_layout.children[len(self.gallery_layout.children) - self.current_image_index - 2]
+        self.gallery_layout.parent.scroll_to(image_button)
 
     def mark_for_deleting(self, instance):
         self.add_action_to_image(self.get_images()[self.current_image_index], Action.DELETE)
