@@ -2,7 +2,6 @@ import asyncio
 from functools import partial
 from os import path, listdir, remove, makedirs
 from shutil import move
-from click import confirmation_option
 from kivy.uix.image import Image
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button

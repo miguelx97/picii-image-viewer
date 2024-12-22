@@ -7,6 +7,9 @@ set MAIN_SCRIPT=main.py
 set INSTALL_DIR=%USERPROFILE%\AppData\Local\%PROJECT_NAME%
 set CONTEXT_MENU_SCRIPT="%USERPROFILE%\AppData\Local\%PROJECT_NAME%\run_picii_image_viewer.ps1"
 
+REM Install dependencies
+pip install -r requirements.txt
+
 REM Verificar si el script se ejecuta desde la carpeta correcta
 if not exist "%PROJECT_FOLDER%%MAIN_SCRIPT%" (
     echo Error: Ejecuta este script desde la carpeta '%PROJECT_NAME%' que contiene '%MAIN_SCRIPT%'.
