@@ -41,12 +41,19 @@ if not exist "%INSTALL_DIR%" (
 )
 
 :: Copy project files to the installation directory
-xcopy /s /y %PROJECT_FOLDER% %INSTALL_DIR%
+xcopy "%PROJECT_FOLDER%\%MAIN_SCRIPT%" %INSTALL_DIR%
+echo D | xcopy /s /y "%PROJECT_FOLDER%\app" %INSTALL_DIR%\app
+echo D | xcopy /s /y "%PROJECT_FOLDER%\assets" %INSTALL_DIR%\assets
+
 
 :: Add context menu entry using REG ADD
 echo Adding context menu entry...
 REG ADD "HKEY_CLASSES_ROOT\Directory\shell\%CONTEXT_MENU_NAME%" /ve /t REG_SZ /f /d "%CONTEXT_MENU_NAME%"
 REG ADD "HKEY_CLASSES_ROOT\Directory\shell\%CONTEXT_MENU_NAME%\command" /ve /t REG_SZ /f /d "%COMMAND%"
+
+:: Restart Windows Explorer to apply changes
+taskkill /f /im explorer.exe
+start explorer.exe
 
 :: Final message
 echo The project '%PROJECT_NAME%' has been installed in %INSTALL_DIR%.
