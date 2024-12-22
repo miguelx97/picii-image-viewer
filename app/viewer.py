@@ -13,12 +13,14 @@ from app.models.action import Action
 import app.models.color as color
 from app.services.persistence import Persistence
 from kivy.uix.actionbar import ActionBar, ActionView, ActionPrevious, ActionButton, ActionGroup
+import sys
 
 class ImageViewer(BoxLayout):
     def __init__(self, **kwargs):
         super(ImageViewer, self).__init__(orientation='vertical', **kwargs)
         Window.maximize()
         Window.bind(on_key_down=self.keyboard_on_key_down)
+        arguments = sys.argv
 
         self.actions = {}
         self.selected_folder:str = None
@@ -69,9 +71,12 @@ class ImageViewer(BoxLayout):
         self.add_widget(self.app_layout)
 
         # Creating a FolderPicker
-        self.folder_picker_layout = FolderPicker(on_folder_selected=self.on_folder_selected)
-        self.app_layout.add_widget(self.folder_picker_layout)
-        # self.on_folder_selected('/home/miguel/Pictures/')
+        if len(arguments) > 1:
+            self.on_folder_selected(arguments[1])
+        else:
+            self.folder_picker_layout = FolderPicker(on_folder_selected=self.on_folder_selected, arguments=arguments)
+            self.app_layout.add_widget(self.folder_picker_layout)
+            # self.on_folder_selected('/home/miguel/Pictures/')
     
     def get_images(self):
         return self.filtered_images if self.filtered_images else self.image_files
@@ -111,8 +116,9 @@ class ImageViewer(BoxLayout):
 
     def show_image_viewer(self):
 
-        # Remove folder picker widget
-        self.app_layout.remove_widget(self.folder_picker_layout)
+        # Remove folder picker widget if it exists
+        if self.app_layout.children and self.app_layout.children[0] == self.folder_picker_layout:
+            self.app_layout.remove_widget(self.folder_picker_layout)
 
         # Create a ScrollView to make the gallery_layout scrollable
         scroll_view = ScrollView(size_hint_x=None, width=200)
