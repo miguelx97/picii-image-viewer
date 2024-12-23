@@ -151,7 +151,8 @@ class ImageViewer(BoxLayout):
         image_viewer_layout = BoxLayout(orientation='vertical')
 
         # Adding the image
-        self.image_view = Image(source=path.join(self.selected_folder, self.get_images()[self.current_image_index]))
+        current_image = path.join(self.selected_folder, self.get_images()[self.current_image_index])
+        self.image_view = Image(source=current_image)
 
         # Adding the top bar
         top_bar = BoxLayout(orientation='horizontal', size_hint_y=None, height=50)
@@ -237,26 +238,40 @@ class ImageViewer(BoxLayout):
         index = len(self.gallery_layout.children) - self.gallery_layout.children.index(instance) - 1
         self.change_image(index)
 
-    async def scroll_to_image_async(self, image_button):
-        # Wait for the next frame before scrolling
-        await asyncio.sleep(0)
-        self.gallery_layout.parent.scroll_to(image_button)
-
     def change_image(self, new_index:int):  
         last_image = self.get_images()[self.current_image_index]
         last_image_color:color
+        layaout_length = len(self.gallery_layout.children)
         if last_image not in self.actions:
             last_image_color = color.BTN_DEFAULT
         else:
             last_image_color = color.BTN_DELETE if self.actions[last_image] == Action.DELETE.value else color.BTN_FAVOURITE
-            
-        self.gallery_layout.children[len(self.gallery_layout.children) - self.current_image_index - 1].background_color = last_image_color  
+
+        self.gallery_layout.children[layaout_length - self.current_image_index - 1].background_color = last_image_color  
         self.current_image_index = new_index
-        self.image_view.source = path.join(self.selected_folder, self.get_images()[self.current_image_index])
-        self.gallery_layout.children[len(self.gallery_layout.children) - self.current_image_index - 1].background_color = color.BTN_SELECTED   
+        current_image = path.join(self.selected_folder, self.get_images()[self.current_image_index])
+
+        # check orientation
+        image = PILImage.open(current_image)
+        if hasattr(image, '_getexif'):
+            exif = image._getexif()
+            if exif:
+                orientation = exif.get(274)
+                if orientation == 3:
+                    image = image.rotate(180, expand=True)
+                elif orientation == 6:
+                    image = image.rotate(270, expand=True)
+                elif orientation == 8:
+                    image = image.rotate(90, expand=True)
+
+        image.save(current_image)
+        self.image_view.source = current_image
+        self.gallery_layout.children[layaout_length - self.current_image_index - 1].background_color = color.BTN_SELECTED
+
         # Scroll to the selected image
-        image_button = self.gallery_layout.children[len(self.gallery_layout.children) - self.current_image_index - 2]
-        self.gallery_layout.parent.scroll_to(image_button)
+        if layaout_length > 20:
+            image_button = self.gallery_layout.children[layaout_length - self.current_image_index - 1]
+            self.gallery_layout.parent.scroll_to(image_button)
 
     def mark_for_deleting(self, instance):
         self.add_action_to_image(self.get_images()[self.current_image_index], Action.DELETE)
@@ -288,8 +303,8 @@ class ImageViewer(BoxLayout):
                 print('Deleting image:', image)
                 remove(path.join(self.selected_folder, image))
         self.actions = {image: action for image, action in self.actions.items() if action != Action.DELETE.value}
-        self.reload_images()
         self.persistence.save(self.actions)
+        self.reload_images(Action.DELETE)
 
     def separate_favourite_images(self, instance):
         count_to_favourite = self.nun_images_by_action(Action.FAVOURITE)
@@ -310,12 +325,14 @@ class ImageViewer(BoxLayout):
                 move(image_path, new_image_path)
 
         self.actions = {image: action for image, action in self.actions.items() if action != Action.FAVOURITE.value}
-        self.reload_images()
         self.persistence.save(self.actions)
+        self.reload_images(Action.FAVOURITE)
 
-    def reload_images(self):
-        self.image_files = [f for f in listdir(self.selected_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    def reload_images(self, action:Action=None):
+        # delete images that has been performed the action especified by the parameter
+        self.image_files = [image for image in self.image_files if image not in self.actions or self.actions[image] != action.value]
         self.load_images_gallery()
+        self.change_image(0)
 
     # KEYBOARD EVENTS
 
